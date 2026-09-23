@@ -30,7 +30,13 @@ jobs:
           cordova create myapp com.abood.chat AboodChat
           cd myapp
           cordova platform add android
-          cp -r ../* www/ 2>/dev/null || true
+          rm -rf www/*
+          for item in ../*; do
+            name=$(basename "$item")
+            if [ "$name" != "myapp" ] && [ "$name" != ".git" ] && [ "$name" != ".github" ]; then
+              cp -r "$item" www/
+            fi
+          done
           cordova build android --debug
 
       - name: Upload APK Artifact
