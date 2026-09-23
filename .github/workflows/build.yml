@@ -37,6 +37,7 @@ jobs:
               cp -r "$item" www/
             fi
           done
+          sed -i '/<widget /a \    <preference name="AndroidInsecureFileModeEnabled" value="true" />' config.xml
           cordova build android --debug
 
       - name: Upload APK Artifact
