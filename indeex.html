@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>عبودشات - AboodChat</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { height: 100dvh; overflow: hidden; background-color: #0b141a; color: #e9edef; }
+
+    .app-container { width: 100%; max-width: 480px; height: 100dvh; margin: 0 auto; background-color: #111b21; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+    /* الشريط العلوي الرئيسي */
+    .top-bar { background-color: #202c33; padding: 12px 16px 0 16px; border-bottom: 1px solid #222d34; flex-shrink: 0; }
+    .top-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .top-bar-title { font-size: 20px; font-weight: bold; color: #00a884; }
+    .top-bar-icons { display: flex; gap: 18px; font-size: 18px; color: #aebac1; position: relative; align-items: center; }
+    .top-bar-icons i { cursor: pointer; }
+
+    .dropdown-menu { position: absolute; top: 30px; left: 0; background: #233138; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); padding: 8px 0; z-index: 100; display: none; width: 190px; }
+    .dropdown-menu.active { display: block; }
+    .dropdown-item { padding: 10px 16px; font-size: 14px; color: #e9edef; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+    .dropdown-item:hover { background-color: #182229; }
+
+    .tabs { display: flex; justify-content: space-around; font-size: 13px; font-weight: 600; color: #8696a0; }
+    .tab { padding: 10px 0; cursor: pointer; flex: 1; text-align: center; border-bottom: 3px solid transparent; }
+    .tab.active { color: #00a884; border-bottom-color: #00a884; }
+
+    .view-content { flex: 1; overflow-y: auto; display: none; background-color: #111b21; }
+    .view-content.active { display: flex; flex-direction: column; }
+
+    .chat-item { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #222d34; cursor: pointer; gap: 14px; }
+    .chat-item:active { background-color: #202c33; }
+    .chat-avatar { width: 46px; height: 46px; border-radius: 50%; background: #0077b6; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: white; flex-shrink: 0; }
+    .chat-details { flex: 1; overflow: hidden; }
+    .chat-title { font-size: 15px; font-weight: 600; color: #e9edef; }
+    .chat-subtitle { font-size: 13px; color: #8696a0; }
+
+    /* شاشة المحادثة */
+    .chat-room-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100dvh; background: #0b141a; z-index: 50; display: none; flex-direction: column; }
+    .chat-room-screen.active { display: flex; }
+    .chat-room-header { background-color: #202c33; padding: 10px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #222d34; }
+
+    .messages-container { flex: 1; padding: 12px; overflow-y: auto; background-image: radial-gradient(#222d34 1px, transparent 0); background-size: 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+    .message-bubble { max-width: 82%; padding: 8px 12px; border-radius: 8px; font-size: 14px; word-break: break-word; }
+    .message-bubble.sent { background-color: #005c4b; color: #e9edef; align-self: flex-start; }
+    .message-bubble.received { background-color: #202c33; color: #e9edef; align-self: flex-end; }
+
+    .media-img { max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 4px; cursor: pointer; }
+    .media-video { max-width: 100%; border-radius: 8px; margin-top: 4px; }
+    .file-card { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; color: #00a884; text-decoration: none; }
+    .audio-player audio { width: 210px; height: 32px; filter: invert(0.8); }
+
+    .input-bar-container { background-color: #202c33; flex-shrink: 0; position: relative; }
+    .input-bar { padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+    .input-bar i { font-size: 20px; color: #8696a0; cursor: pointer; }
+    .input-field { flex: 1; background-color: #2a3942; border: none; border-radius: 20px; padding: 10px 14px; color: #e9edef; font-size: 15px; outline: none; }
+    .mic-btn { background-color: #00a884; color: #111b21; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .recording-indicator { color: #f15c6d; font-size: 13px; font-weight: bold; display: none; align-items: center; gap: 6px; flex: 1; }
+
+    .attachment-menu { position: absolute; bottom: 58px; right: 40px; background: #233138; border-radius: 12px; padding: 12px; display: none; flex-direction: column; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 60; }
+    .attachment-menu.active { display: flex; }
+    .attach-btn { display: flex; align-items: center; gap: 10px; color: #e9edef; font-size: 14px; cursor: pointer; }
+
+    /* شاشة الإعدادات الشاملة */
+    .settings-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100dvh; background: #111b21; z-index: 150; display: none; flex-direction: column; }
+    .settings-screen.active { display: flex; }
+    .settings-header { background: #202c33; padding: 14px 16px; display: flex; align-items: center; gap: 15px; font-size: 18px; font-weight: bold; color: #00a884; border-bottom: 1px solid #222d34; }
+
+    .accounts-switcher-bar { background: #182229; padding: 12px 16px; border-bottom: 1px solid #222d34; display: flex; flex-direction: column; gap: 10px; }
+    .accounts-list-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 5px; }
+    .account-badge { display: flex; flex-direction: column; align-items: center; cursor: pointer; opacity: 0.6; transition: 0.2s; min-width: 60px; }
+    .account-badge.active { opacity: 1; }
+    .account-badge .acc-avatar { width: 44px; height: 44px; border-radius: 50%; background: #0077b6; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid transparent; }
+    .account-badge.active .acc-avatar { border-color: #00a884; }
+    .account-badge span { font-size: 11px; margin-top: 4px; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .settings-body { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+    .setting-section-title { padding: 12px 16px 6px 16px; font-size: 12px; font-weight: bold; color: #00a884; text-transform: uppercase; }
+    .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #1f2c34; cursor: pointer; background: #111b21; }
+    .setting-row:active { background: #202c33; }
+    .setting-left { display: flex; align-items: center; gap: 14px; font-size: 15px; }
+    .setting-left i { width: 22px; text-align: center; color: #8696a0; font-size: 17px; }
+    .setting-val { font-size: 13px; color: #8696a0; }
+
+    .sub-settings-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100dvh; background: #111b21; z-index: 180; display: none; flex-direction: column; }
+    .sub-settings-panel.active { display: flex; }
+    .form-control-input { width: 100%; background: #182229; border: 1px solid #2a3942; padding: 10px; border-radius: 6px; color: white; outline: none; margin-top: 6px; margin-bottom: 12px; }
+    .btn-save { background: #00a884; color: #111b21; border: none; padding: 12px; border-radius: 6px; font-weight: bold; width: 100%; margin-top: 10px; cursor: pointer; }
+
+    .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100dvh; background: rgba(0,0,0,0.85); z-index: 200; display: none; flex-direction: column; padding: 20px; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-card { background: #222d34; border-radius: 12px; padding: 20px; max-height: 90vh; overflow-y: auto; }
+
+    .story-viewer { position: absolute; top: 0; left: 0; width: 100%; height: 100dvh; background: #000; z-index: 300; display: none; flex-direction: column; justify-content: center; align-items: center; }
+    .story-viewer.active { display: flex; }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  
+  <!-- 1. الشريط العلوي الرئيسي (الاسم المعدل: عبودشات) -->
+  <div class="top-bar">
+    <div class="top-bar-header">
+      <div class="top-bar-title">عبودشات</div>
+      <div class="top-bar-icons">
+        <i class="fas fa-gear" onclick="openSettingsScreen()" title="الإعدادات" style="color: #00a884;"></i>
+        <i class="fas fa-search" onclick="openModal('searchUserModal')"></i>
+        <i class="fas fa-ellipsis-vertical" onclick="toggleDropdown()"></i>
+
+        <div class="dropdown-menu" id="dropdownMenu">
+          <div class="dropdown-item" onclick="openModal('createGroupModal')"><i class="fas fa-users"></i> مجموعة جديدة</div>
+          <div class="dropdown-item" onclick="openModal('createChannelModal')"><i class="fas fa-bullhorn"></i> قناة جديدة</div>
+          <div class="dropdown-item" onclick="openModal('addStatusModal')"><i class="fas fa-circle-plus"></i> إضافة حالة/استوري</div>
+          <div class="dropdown-item" onclick="openModal('searchUserModal')"><i class="fas fa-user-plus"></i> بحث عن شخص</div>
+          <div class="dropdown-item" onclick="openSettingsScreen()"><i class="fas fa-gear"></i> الإعدادات الشاملة ⚙️</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('chats')">الدردشات</div>
+      <div class="tab" onclick="switchTab('channels')">القنوات</div>
+      <div class="tab" onclick="switchTab('status')">الحالات</div>
+    </div>
+  </div>
+
+  <!-- 2. تبويب الدردشات والمجموعات -->
+  <div id="chatsView" class="view-content active">
+    <div id="chatsList">
+      <div class="chat-item" onclick="openChatRoom('101', 'المحادثة الجماعية (101)')">
+        <div class="chat-avatar">101</div>
+        <div class="chat-details">
+          <div class="chat-title">المحادثة الجماعية (101)</div>
+          <div class="chat-subtitle">محادثة مفتوحة للجميع</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. تبويب القنوات -->
+  <div id="channelsView" class="view-content">
+    <div id="channelsList"></div>
+  </div>
+
+  <!-- 4. تبويب الحالات -->
+  <div id="statusView" class="view-content">
+    <div class="chat-item" onclick="openModal('addStatusModal')">
+      <div class="chat-avatar" style="background:#00a884;"><i class="fas fa-plus"></i></div>
+      <div class="chat-details">
+        <div class="chat-title">إضافة حالة جديدة</div>
+        <div class="chat-subtitle">رفع صورة أو فيديو أو نص من الهاتف</div>
+      </div>
+    </div>
+    <div style="padding: 8px 16px; font-size: 12px; color: #8696a0; font-weight: bold;">الحالات والقصص الأخيرة</div>
+    <div id="statusesList"></div>
+  </div>
+
+  <!-- 5. شاشة الغرفة / القناة النشطة -->
+  <div class="chat-room-screen" id="chatRoomScreen">
+    <div class="chat-room-header">
+      <i class="fas fa-arrow-right" onclick="closeChatRoom()" style="cursor:pointer; font-size:18px;"></i>
+      <div style="flex:1;">
+        <h4 id="roomTitle" style="font-size:15px;">المحادثة</h4>
+        <span style="font-size:11px; color:#00a884;">متصل الآن</span>
+      </div>
+    </div>
+
+    <div class="messages-container" id="messagesBox"></div>
+
+    <div class="input-bar-container">
+      <div class="attachment-menu" id="attachmentMenu">
+        <label class="attach-btn"><i class="fas fa-image" style="color:#bf59cf;"></i> صورة من الاستوديو <input type="file" accept="image/*" style="display:none;" onchange="handleFileUpload(this, 'image')"></label>
+        <label class="attach-btn"><i class="fas fa-video" style="color:#f44336;"></i> فيديو من الاستوديو <input type="file" accept="video/*" style="display:none;" onchange="handleFileUpload(this, 'video')"></label>
+        <label class="attach-btn"><i class="fas fa-file" style="color:#5f66cd;"></i> مستند / ملف <input type="file" accept="*" style="display:none;" onchange="handleFileUpload(this, 'file')"></label>
+      </div>
+
+      <div class="input-bar">
+        <i class="fas fa-paperclip" onclick="toggleAttachmentMenu()"></i>
+        <input type="text" class="input-field" id="msgInput" placeholder="مراسلة..." onkeypress="if(event.key==='Enter') sendTextMessage()">
+        
+        <div class="recording-indicator" id="recordingStatus">
+          <i class="fas fa-microphone"></i>
+          <span id="recordingTimer">00:00</span> جاري تسجيل الصوت...
+        </div>
+
+        <div class="mic-btn" id="actionBtn" onclick="handleActionBtn()">
+          <i class="fas fa-microphone" id="actionIcon"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. شاشة الإعدادات الشاملة (الـ 10 أقسام) -->
+  <div class="settings-screen" id="settingsScreen">
+    <div class="settings-header">
+      <i class="fas fa-arrow-right" onclick="closeSettingsScreen()" style="cursor:pointer;"></i>
+      <span>إعدادات عبودشات ⚙️</span>
+    </div>
+
+    <!-- شريط الحسابات الـ 10 -->
+    <div class="accounts-switcher-bar">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12px; font-weight:bold; color:#00a884;">إدارة الحسابات المتعددة (حتى 10):</span>
+        <button onclick="addNewAccount()" style="background:#00a884; color:#111b21; border:none; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">+ إضافة حساب</button>
+      </div>
+      <div class="accounts-list-scroll" id="accountsScrollList"></div>
+    </div>
+
+    <!-- قائمة الأقسام الـ 10 الكاملة -->
+    <div class="settings-body">
+      <div class="setting-section-title">1. إعدادات الحساب (Account)</div>
+      <div class="setting-row" onclick="openSubSettings('accountModal')">
+        <div class="setting-left"><i class="fas fa-user-circle"></i> <span>بيانات الحساب، اليوزر، والنبذة</span></div>
+        <div class="setting-val" id="accEmailVal">تعديل</div>
+      </div>
+
+      <div class="setting-section-title">2. الخصوصية والأمان (Privacy & Security)</div>
+      <div class="setting-row" onclick="openSubSettings('privacyModal')">
+        <div class="setting-left"><i class="fas fa-lock"></i> <span>الرقم، الظهور، الحظر، التحقق 2FA</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">3. الإخطارات (Notifications)</div>
+      <div class="setting-row" onclick="openSubSettings('notifModal')">
+        <div class="setting-left"><i class="fas fa-bell"></i> <span>أصوات الإشعارات، الفترات الهادئة</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">4. إعدادات الدردشة (Chats)</div>
+      <div class="setting-row" onclick="openSubSettings('chatSettingsModal')">
+        <div class="setting-left"><i class="fas fa-comment-dots"></i> <span>حجم الخط، الفقاعات، التحميل التلقائي</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">5. إعدادات المظهر (Appearance)</div>
+      <div class="setting-row" onclick="openSubSettings('appearanceModal')">
+        <div class="setting-left"><i class="fas fa-palette"></i> <span>الثيم (داكن/فاتح)، اللغة</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">6. البيانات والتخزين (Data & Storage)</div>
+      <div class="setting-row" onclick="openSubSettings('storageModal')">
+        <div class="setting-left"><i class="fas fa-database"></i> <span>استخدام التخزين، تنظيف المخبأ Cache</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">7. الشبكة والبيانات (Network)</div>
+      <div class="setting-row" onclick="openSubSettings('networkModal')">
+        <div class="setting-left"><i class="fas fa-wifi"></i> <span>موفر البيانات Data Saver، VPN</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">8. إعدادات الأداء (Performance)</div>
+      <div class="setting-row" onclick="openSubSettings('perfModal')">
+        <div class="setting-left"><i class="fas fa-bolt"></i> <span>تسريع الحركات، استخدام GPU</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+
+      <div class="setting-section-title">9. الدعم والمساعدة (Help)</div>
+      <div class="setting-row" onclick="alert('تطبيق عبودشات - الإصدار v4.0.0\nفريق الدعم متصل.')">
+        <div class="setting-left"><i class="fas fa-circle-question"></i> <span>الأسئلة الشائعة FAQ، الإصدار</span></div>
+        <div class="setting-val">v4.0.0</div>
+      </div>
+
+      <div class="setting-section-title">10. إعدادات إضافية (Advanced)</div>
+      <div class="setting-row" onclick="openSubSettings('advancedModal')">
+        <div class="setting-left"><i class="fas fa-shield-halved"></i> <span>التشفير Secret Chats، والأذونات</span></div>
+        <div class="setting-val"><i class="fas fa-chevron-left"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. النوافذ الفرعية للإعدادات -->
+  <div class="sub-settings-panel" id="accountModal">
+    <div class="settings-header">
+      <i class="fas fa-arrow-right" onclick="closeSubSettings('accountModal')" style="cursor:pointer;"></i>
+      <span>تعديل إعدادات الحساب</span>
+    </div>
+    <div style="padding:20px; flex:1; overflow-y:auto;">
+      <label style="font-size:12px; color:#8696a0;">البريد الإلكتروني:</label>
+      <input type="email" class="form-control-input" id="editEmailInput">
+
+      <label style="font-size:12px; color:#8696a0;">اسم المستخدم Username (@):</label>
+      <input type="text" class="form-control-input" id="editUsernameInput">
+
+      <label style="font-size:12px; color:#8696a0;">النبذة Bio:</label>
+      <input type="text" class="form-control-input" id="editBioInput">
+
+      <label style="font-size:12px; color:#8696a0;">حالة النشاط:</label>
+      <select class="form-control-input" id="editStatusSelect">
+        <option value="نشط الآن">نشط الآن</option>
+        <option value="مشغول">مشغول</option>
+        <option value="في العمل">في العمل</option>
+      </select>
+
+      <button class="btn-save" onclick="saveAccountSubSettings()">حفظ التغيرات</button>
+    </div>
+  </div>
+
+  <div class="sub-settings-panel" id="privacyModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('privacyModal')"></i> <span>الخصوصية والأمان</span></div>
+    <div style="padding:20px;">
+      <label style="font-size:12px; color:#8696a0;">من يستطيع رؤية رقمي والصورة:</label>
+      <select class="form-control-input"><option>الجميع</option><option>جهات اتصالي</option><option>لا أحد</option></select>
+      <label style="font-size:12px; color:#8696a0;">التحقق بخطوتين 2FA:</label>
+      <select class="form-control-input"><option>مفعل</option><option>معطل</option></select>
+      <button class="btn-save" onclick="closeSubSettings('privacyModal')">حفظ الخصوصية</button>
+    </div>
+  </div>
+
+  <div class="sub-settings-panel" id="notifModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('notifModal')"></i> <span>الإخطارات والأصوات</span></div>
+    <div style="padding:20px;">
+      <label style="font-size:12px; color:#8696a0;">أصوات الرسائل والإشعارات:</label>
+      <select class="form-control-input"><option>تفعيل الكل</option><option>كتم الأصوات</option></select>
+      <button class="btn-save" onclick="closeSubSettings('notifModal')">حفظ</button>
+    </div>
+  </div>
+
+  <div class="sub-settings-panel" id="chatSettingsModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('chatSettingsModal')"></i> <span>إعدادات الدردشة</span></div>
+    <div style="padding:20px;">
+      <label style="font-size:12px; color:#8696a0;">حجم الخط والفقاعات:</label>
+      <select class="form-control-input"><option>عادي</option><option>كبير</option></select>
+      <button class="btn-save" onclick="closeSubSettings('chatSettingsModal')">حفظ</button>
+    </div>
+  </div>
+
+  <div class="sub-settings-panel" id="appearanceModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('appearanceModal')"></i> <span>المظهر واللغة</span></div>
+    <div style="padding:20px;">
+      <label style="font-size:12px; color:#8696a0;">المظهر Theme:</label>
+      <select class="form-control-input"><option>داكن (Dark)</option><option>فاتح (Light)</option></select>
+      <button class="btn-save" onclick="closeSubSettings('appearanceModal')">تطبيق المظهر</button>
+    </div>
+  </div>
+
+  <div class="sub-settings-panel" id="storageModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('storageModal')"></i> <span>البيانات والتخزين</span></div>
+    <div style="padding:20px;"><button class="btn-save" onclick="alert('تم تنظيف ملفات الـ Cache بنجاح!'); closeSubSettings('storageModal');">تنظيف ذاكرة المخبأ Cache</button></div>
+  </div>
+
+  <div class="sub-settings-panel" id="networkModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('networkModal')"></i> <span>الشبكة والبيانات</span></div>
+    <div style="padding:20px;"><button class="btn-save" onclick="closeSubSettings('networkModal')">حفظ</button></div>
+  </div>
+
+  <div class="sub-settings-panel" id="perfModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('perfModal')"></i> <span>الأداء والرسوميات</span></div>
+    <div style="padding:20px;"><button class="btn-save" onclick="closeSubSettings('perfModal')">حفظ</button></div>
+  </div>
+
+  <div class="sub-settings-panel" id="advancedModal">
+    <div class="settings-header"><i class="fas fa-arrow-right" onclick="closeSubSettings('advancedModal')"></i> <span>إعدادات إضافية</span></div>
+    <div style="padding:20px;"><button class="btn-save" onclick="closeSubSettings('advancedModal')">حفظ</button></div>
+  </div>
+
+  <!-- 8. النوافذ المودال العامة -->
+  <div class="modal-overlay" id="createGroupModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-weight:bold; color:#00a884;">
+        <span>إنشاء مجموعة جديدة</span>
+        <i class="fas fa-xmark" onclick="closeModal('createGroupModal')" style="cursor:pointer;"></i>
+      </div>
+      <input type="text" class="form-control-input" id="groupTitleInput" placeholder="اسم المجموعة">
+      <button class="btn-save" onclick="createNewGroup()">إنشاء المجموعة</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="createChannelModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-weight:bold; color:#00a884;">
+        <span>إنشاء قناة جديدة 📢</span>
+        <i class="fas fa-xmark" onclick="closeModal('createChannelModal')" style="cursor:pointer;"></i>
+      </div>
+      <input type="text" class="form-control-input" id="channelTitleInput" placeholder="اسم القناة">
+      <input type="text" class="form-control-input" id="channelDescInput" placeholder="وصف القناة...">
+      <button class="btn-save" onclick="createNewChannel()">إنشاء القناة</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="addStatusModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-weight:bold; color:#00a884;">
+        <span>إضافة حالة / استوري جديدة</span>
+        <i class="fas fa-xmark" onclick="closeModal('addStatusModal')" style="cursor:pointer;"></i>
+      </div>
+      <input type="file" accept="image/*,video/*" class="form-control-input" id="statusFileInput">
+      <input type="text" class="form-control-input" id="statusTextInput" placeholder="أو اكتب نص الاستوري...">
+      <button class="btn-save" onclick="postNewStatus()">نشر الحالة الآن</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="searchUserModal">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-weight:bold; color:#00a884;">
+        <span>البحث عن مستخدم بـ ID أو اليوزر</span>
+        <i class="fas fa-xmark" onclick="closeModal('searchUserModal')" style="cursor:pointer;"></i>
+      </div>
+      <input type="text" class="form-control-input" id="searchInput" placeholder="أدخل الـ 8 أرقام ID أو @username">
+      <button class="btn-save" onclick="searchUser()">بحث</button>
+      <div id="searchResults" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <div class="story-viewer" id="storyViewer" onclick="closeStoryViewer()">
+    <div id="storyContent" style="color:white; text-align:center; padding:20px;"></div>
+  </div>
+
+</div>
+
+<script>
+  let myAccounts = JSON.parse(localStorage.getItem('my_whatsapp_accounts')) || [];
+  let currentAccIndex = 0;
+
+  if (myAccounts.length === 0) {
+    const firstId = String(Math.floor(10000000 + Math.random() * 90000000));
+    myAccounts.push({
+      id: firstId,
+      email: `user_${firstId.slice(-4)}@gmail.com`,
+      username: `@user_${firstId.slice(-4)}`,
+      name: `مستخدم ${firstId.slice(-4)}`,
+      status: 'نشط الآن',
+      bio: 'متاح لاستخدام عبودشات'
+    });
+    localStorage.setItem('my_whatsapp_accounts', JSON.stringify(myAccounts));
+  }
+
+  let activeConversationId = null;
+  const socket = io();
+
+  socket.on('connect', () => {
+    registerActiveAccount();
+    socket.emit('get_statuses');
+    socket.emit('get_channels');
+  });
+
+  function registerActiveAccount() {
+    const activeAcc = myAccounts[currentAccIndex];
+    socket.emit('register_user', activeAcc);
+    renderAccountsScroll();
+    updateAccountUI();
+  }
+
+  function addNewAccount() {
+    if (myAccounts.length >= 10) return alert('وصلت للحد الأقصى (10 حسابات).');
+    const newId = String(Math.floor(10000000 + Math.random() * 90000000));
+    const newAcc = {
+      id: newId,
+      email: `account${myAccounts.length + 1}@gmail.com`,
+      username: `@user_${newId.slice(-4)}`,
+      name: `حساب ${myAccounts.length + 1}`,
+      status: 'نشط الآن',
+      bio: 'متاح للاستخدام'
+    };
+    myAccounts.push(newAcc);
+    localStorage.setItem('my_whatsapp_accounts', JSON.stringify(myAccounts));
+    currentAccIndex = myAccounts.length - 1;
+    registerActiveAccount();
+    alert(`تم إنشاء الحساب رقم ${myAccounts.length} والتبديل إليه بنجاح!`);
+  }
+
+  function switchAccount(index) {
+    currentAccIndex = index;
+    registerActiveAccount();
+  }
+
+  function renderAccountsScroll() {
+    const list = document.getElementById('accountsScrollList');
+    list.innerHTML = myAccounts.map((acc, idx) => `
+      <div class="account-badge ${idx === currentAccIndex ? 'active' : ''}" onclick="switchAccount(${idx})">
+        <div class="acc-avatar">${acc.name[0]}</div>
+        <span>${acc.name}</span>
+      </div>
+    `).join('');
+  }
+
+  function updateAccountUI() {
+    const activeAcc = myAccounts[currentAccIndex];
+    document.getElementById('accEmailVal').innerText = activeAcc.email;
+    document.getElementById('editEmailInput').value = activeAcc.email;
+    document.getElementById('editUsernameInput').value = activeAcc.username;
+    document.getElementById('editBioInput').value = activeAcc.bio;
+  }
+
+  function toggleDropdown() { document.getElementById('dropdownMenu').classList.toggle('active'); }
+  function openSettingsScreen() { document.getElementById('settingsScreen').classList.add('active'); document.getElementById('dropdownMenu').classList.remove('active'); }
+  function closeSettingsScreen() { document.getElementById('settingsScreen').classList.remove('active'); }
+  function openSubSettings(id) { document.getElementById(id).classList.add('active'); }
+  function closeSubSettings(id) { document.getElementById(id).classList.remove('active'); }
+
+  function saveAccountSubSettings() {
+    const activeAcc = myAccounts[currentAccIndex];
+    activeAcc.email = document.getElementById('editEmailInput').value;
+    activeAcc.username = document.getElementById('editUsernameInput').value;
+    activeAcc.bio = document.getElementById('editBioInput').value;
+    activeAcc.status = document.getElementById('editStatusSelect').value;
+
+    localStorage.setItem('my_whatsapp_accounts', JSON.stringify(myAccounts));
+    socket.emit('update_profile', activeAcc);
+    updateAccountUI();
+    closeSubSettings('accountModal');
+    alert('تم حفظ بيانات الحساب بنجاح!');
+  }
+
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+
+    if(tabName === 'chats') {
+      document.querySelectorAll('.tab')[0].classList.add('active');
+      document.getElementById('chatsView').classList.add('active');
+    } else if(tabName === 'channels') {
+      document.querySelectorAll('.tab')[1].classList.add('active');
+      document.getElementById('channelsView').classList.add('active');
+    } else if(tabName === 'status') {
+      document.querySelectorAll('.tab')[2].classList.add('active');
+      document.getElementById('statusView').classList.add('active');
+    }
+  }
+
+  function openChatRoom(convId, title) {
+    activeConversationId = convId;
+    document.getElementById('roomTitle').innerText = title;
+    document.getElementById('chatRoomScreen').classList.add('active');
+    socket.emit('join_conversation', convId);
+  }
+
+  function closeChatRoom() { document.getElementById('chatRoomScreen').classList.remove('active'); }
+
+  function sendTextMessage() {
+    const input = document.getElementById('msgInput');
+    if (!input.value.trim() || !activeConversationId) return;
+
+    const activeAcc = myAccounts[currentAccIndex];
+    socket.emit('send_message', {
+      conversationId: activeConversationId,
+      senderId: activeAcc.id,
+      senderName: activeAcc.name,
+      content: input.value,
+      type: 'text'
+    });
+    input.value = '';
+    document.getElementById('actionIcon').className = 'fas fa-microphone';
+  }
+
+  function toggleAttachmentMenu() { document.getElementById('attachmentMenu').classList.toggle('active'); }
+
+  function handleFileUpload(input, mediaType) {
+    const file = input.files[0];
+    if (!file || !activeConversationId) return;
+    const activeAcc = myAccounts[currentAccIndex];
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      socket.emit('send_message', {
+        conversationId: activeConversationId,
+        senderId: activeAcc.id,
+        senderName: activeAcc.name,
+        content: e.target.result,
+        fileName: file.name,
+        type: mediaType
+      });
+      document.getElementById('attachmentMenu').classList.remove('active');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  let mediaRecorder, audioChunks = [], isRecording = false, recordTimerInterval, secondsRecorded = 0;
+
+  async function handleActionBtn() {
+    if (document.getElementById('msgInput').value.trim().length > 0) {
+      sendTextMessage();
+      return;
+    }
+    if (!isRecording) startRecording();
+    else stopRecordingAndSend();
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+      mediaRecorder.start();
+
+      isRecording = true;
+      document.getElementById('msgInput').style.display = 'none';
+      document.getElementById('recordingStatus').style.display = 'flex';
+      document.getElementById('actionIcon').className = 'fas fa-paper-plane';
+
+      secondsRecorded = 0;
+      recordTimerInterval = setInterval(() => {
+        secondsRecorded++;
+        const mins = String(Math.floor(secondsRecorded / 60)).padStart(2, '0');
+        const secs = String(secondsRecorded % 60).padStart(2, '0');
+        document.getElementById('recordingTimer').innerText = `${mins}:${secs}`;
+      }, 1000);
+    } catch (err) {
+      alert('الوصول للميكروفون مطلوب لتسجيل الصوت: ' + err.message);
+    }
+  }
+
+  function stopRecordingAndSend() {
+    if (!mediaRecorder) return;
+    mediaRecorder.stop();
+    mediaRecorder.onstop = () => {
+      const activeAcc = myAccounts[currentAccIndex];
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = () => {
+        socket.emit('send_message', {
+          conversationId: activeConversationId,
+          senderId: activeAcc.id,
+          senderName: activeAcc.name,
+          content: reader.result,
+          type: 'audio'
+        });
+      };
+      clearInterval(recordTimerInterval);
+      isRecording = false;
+      document.getElementById('msgInput').style.display = 'block';
+      document.getElementById('recordingStatus').style.display = 'none';
+      document.getElementById('actionIcon').className = 'fas fa-microphone';
+    };
+  }
+
+  document.getElementById('msgInput').addEventListener('input', (e) => {
+    document.getElementById('actionIcon').className = e.target.value.trim().length > 0 ? 'fas fa-paper-plane' : 'fas fa-microphone';
+  });
+
+  socket.on('load_history', (messages) => {
+    const box = document.getElementById('messagesBox');
+    box.innerHTML = '';
+    messages.forEach(renderMessage);
+  });
+
+  socket.on('receive_message', (msg) => renderMessage(msg));
+
+  function renderMessage(msg) {
+    const box = document.getElementById('messagesBox');
+    const msgDiv = document.createElement('div');
+    const activeAcc = myAccounts[currentAccIndex];
+    const isMe = msg.senderId === activeAcc.id;
+
+    msgDiv.className = `message-bubble ${isMe ? 'sent' : 'received'}`;
+    const timeStr = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+
+    let contentHtml = '';
+    if (msg.type === 'text') contentHtml = `<div>${msg.content}</div>`;
+    else if (msg.type === 'image') contentHtml = `<img src="${msg.content}" class="media-img" onclick="window.open(this.src)">`;
+    else if (msg.type === 'video') contentHtml = `<video src="${msg.content}" controls class="media-video"></video>`;
+    else if (msg.type === 'audio' || msg.content.startsWith('data:audio')) contentHtml = `<div class="audio-player"><audio controls src="${msg.content}"></audio></div>`;
+    else if (msg.type === 'file') contentHtml = `<a href="${msg.content}" download="${msg.fileName || 'file'}" class="file-card"><i class="fas fa-file-download" style="font-size:20px;"></i> <span>${msg.fileName || 'تحميل'}</span></a>`;
+
+    msgDiv.innerHTML = `
+      ${!isMe ? `<span style="font-size:11px; font-weight:bold; color:#00a884; display:block;">${msg.senderName}</span>` : ''}
+      ${contentHtml}
+      <div style="font-size:10px; color:#8696a0; text-align:left; margin-top:4px;">${timeStr}</div>
+    `;
+
+    box.appendChild(msgDiv);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function createNewGroup() {
+    const title = document.getElementById('groupTitleInput').value.trim();
+    if (!title) return;
+    socket.emit('create_group', { title: title });
+    closeModal('createGroupModal');
+  }
+
+  socket.on('group_created', (group) => {
+    const list = document.getElementById('chatsList');
+    const div = document.createElement('div');
+    div.className = 'chat-item';
+    div.onclick = () => openChatRoom(group.id, group.title);
+    div.innerHTML = `<div class="chat-avatar" style="background:#00a884;">${group.title[0]}</div><div class="chat-details"><div class="chat-title">${group.title}</div><div class="chat-subtitle">مجموعة جديدة</div></div>`;
+    list.prepend(div);
+    openChatRoom(group.id, group.title);
+  });
+
+  function createNewChannel() {
+    const title = document.getElementById('channelTitleInput').value.trim();
+    const desc = document.getElementById('channelDescInput').value.trim();
+    if (!title) return;
+    socket.emit('create_channel', { title: title, description: desc });
+    closeModal('createChannelModal');
+  }
+
+  socket.on('channel_created', () => socket.emit('get_channels'));
+
+  socket.on('load_channels', (channels) => {
+    const list = document.getElementById('channelsList');
+    list.innerHTML = channels.map(c => `
+      <div class="chat-item" onclick="openChatRoom('${c.id}', '${c.title}')">
+        <div class="chat-avatar" style="background:#3b82f6;"><i class="fas fa-bullhorn"></i></div>
+        <div class="chat-details"><div class="chat-title">${c.title}</div><div class="chat-subtitle">${c.description || 'قناة رسمية'}</div></div>
+      </div>
+    `).join('');
+  });
+
+  function postNewStatus() {
+    const text = document.getElementById('statusTextInput').value;
+    const fileInput = document.getElementById('statusFileInput');
+    const activeAcc = myAccounts[currentAccIndex];
+
+    if (fileInput.files.length > 0) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        socket.emit('post_status', {
+          userId: activeAcc.id,
+          userName: activeAcc.name,
+          type: fileInput.files[0].type.startsWith('video') ? 'video' : 'image',
+          content: e.target.result
+        });
+        closeModal('addStatusModal');
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else if (text.trim()) {
+      socket.emit('post_status', {
+        userId: activeAcc.id,
+        userName: activeAcc.name,
+        type: 'text',
+        content: text
+      });
+      closeModal('addStatusModal');
+    }
+  }
+
+  socket.on('load_statuses', (statuses) => {
+    const list = document.getElementById('statusesList');
+    list.innerHTML = statuses.map(s => `
+      <div class="chat-item" onclick="viewStory('${encodeURIComponent(JSON.stringify(s))}')">
+        <div class="chat-avatar" style="border:2px solid #00a884;">${s.userName[0]}</div>
+        <div class="chat-details"><div class="chat-title">${s.userName}</div><div class="chat-subtitle">${new Date(s.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div></div>
+      </div>
+    `).join('');
+  });
+
+  socket.on('new_status', () => socket.emit('get_statuses'));
+
+  function viewStory(encoded) {
+    const story = JSON.parse(decodeURIComponent(encoded));
+    const viewer = document.getElementById('storyViewer');
+    const content = document.getElementById('storyContent');
+
+    if (story.type === 'text') content.innerHTML = `<div style="background:#00a884; padding:30px; border-radius:12px; font-size:22px;">${story.content}</div>`;
+    else if (story.type === 'image') content.innerHTML = `<img src="${story.content}" style="max-width:100%; max-height:80vh; border-radius:8px;">`;
+    else if (story.type === 'video') content.innerHTML = `<video src="${story.content}" autoplay controls style="max-width:100%; max-height:80vh; border-radius:8px;"></video>`;
+    
+    viewer.classList.add('active');
+  }
+
+  function closeStoryViewer() { document.getElementById('storyViewer').classList.remove('active'); }
+
+  function searchUser() {
+    const query = document.getElementById('searchInput').value;
+    if (query) socket.emit('search_user', query);
+  }
+
+  socket.on('search_results', (results) => {
+    const container = document.getElementById('searchResults');
+    if (results.length === 0) {
+      container.innerHTML = '<div style="color:#8696a0; font-size:13px; padding:10px;">لم يتم العثور على مستخدمين</div>';
+      return;
+    }
+    container.innerHTML = results.map(u => `
+      <div class="chat-item" onclick="startDirectChat('${u.id}', '${u.name}')" style="background:#111b21; border-radius:8px; margin-bottom:8px;">
+        <div class="chat-avatar">${u.name[0]}</div>
+        <div class="chat-details"><div class="chat-title">${u.name} (${u.username || u.id})</div><div class="chat-subtitle">ID: ${u.id}</div></div>
+      </div>
+    `).join('');
+  });
+
+  function startDirectChat(userId, userName) {
+    const activeAcc = myAccounts[currentAccIndex];
+    const convId = [activeAcc.id, userId].sort().join('_');
+    closeModal('searchUserModal');
+
+    const chatsList = document.getElementById('chatsList');
+    const userDiv = document.createElement('div');
+    userDiv.className = 'chat-item';
+    userDiv.onclick = () => openChatRoom(convId, userName);
+    userDiv.innerHTML = `<div class="chat-avatar">${userName[0]}</div><div class="chat-details"><div class="chat-title">${userName}</div><div class="chat-subtitle">شات خاص</div></div>`;
+    chatsList.prepend(userDiv);
+    openChatRoom(convId, userName);
+  }
+
+  function openModal(id) { document.getElementById(id).classList.add('active'); document.getElementById('dropdownMenu').classList.remove('active'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+</script>
+</body>
+</html>
+
